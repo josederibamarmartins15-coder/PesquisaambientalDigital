@@ -1,2 +1,150 @@
-<!-- index.html: interface de votação -->
-[Conteúdo HTML completo da interface de votação gerado acima]
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pesquisa - Monitoramento e Educação Ambiental Digital</title>
+  <style>
+    :root{--accent:#2b8a3e;--card:#ffffff;--bg-overlay:rgba(0,0,0,0.45);}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Arial;margin:0;padding:0}
+    body{min-height:100vh;background:#0b3;display:flex;align-items:center;justify-content:center;color:#222}
+    .hero{position:fixed;inset:0;background-image:url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1950&q=80');background-size:cover;background-position:center;filter:brightness(0.8) saturate(1);}
+    .overlay{position:fixed;inset:0;background:var(--bg-overlay);}
+    .card{position:relative;z-index:2;width:96%;max-width:1000px;background:var(--card);border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,0.25)}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+    header img{width:64px;height:64px;border-radius:10px;object-fit:cover}
+    header h1{color:var(--accent);font-size:1.3rem}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    .question{padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#f6f6f6);margin-bottom:12px}
+    .options{display:flex;gap:8px;flex-wrap:wrap}
+    .option{flex:1 1 120px;padding:9px;border-radius:8px;border:1px solid #ddd;text-align:center;cursor:pointer}
+    .option.selected{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+    .btn{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:none;cursor:pointer}
+    .btn.secondary{background:#eee;color:#333}
+    aside{background:linear-gradient(180deg,#fff,#fafafa);padding:12px;border-radius:10px}
+    .small{font-size:0.95rem;color:#333}
+    footer{margin-top:12px;color:#333}
+  </style>
+</head>
+<body>
+  <div class="hero" aria-hidden></div>
+  <div class="overlay" aria-hidden></div>
+  <div class="card" role="main">
+    <header>
+      <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=60" alt="drone sobre floresta">
+      <div>
+        <h1>Pesquisa: Monitoramento e Educação Ambiental Digital</h1>
+        <div class="small">Obrigado por participar — respostas anônimas.</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn" id="view-results">Ver resultados</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <main id="main-area">
+        <div id="questions"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button class="btn" id="submit">Enviar respostas</button>
+          <div class="small" id="status">0/0 respondidas</div>
+        </div>
+        <div id="message" style="margin-top:10px"></div>
+        <footer>
+          <div class="small">Esta pesquisa grava somente contagens anônimas no Firebase. Para testar sem banco, carregue a página offline.</div>
+        </footer>
+      </main>
+      <aside>
+        <h3>Sobre</h3>
+        <p class="small">Pesquisa sobre uso de tecnologia no monitoramento e educação ambiental. As perguntas aparecem em ordem diferente para cada visitante.</p>
+        <div style="margin-top:12px">
+          <div class="small"><strong>Progresso</strong></div>
+          <div id="progress" style="margin-top:8px"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Firebase compat libs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Firebase config and init -->
+  <script src="firebase.js"></script>
+
+  <script>
+    const QUESTIONS = [
+      {'id':'q1','text':'Você acha que o monitoramento digital pode ajudar a fiscalizar empresas poluidoras?','options':['Sim','Talvez','Não']},
+      {'id':'q2','text':'Você apoiaria o uso de tecnologias (como sensores e aplicativos) para melhorar o cuidado com o meio ambiente na sua cidade?','options':['Sim','Talvez','Não']},
+      {'id':'q3','text':'Você costuma refletir sobre como suas ações afetam o meio ambiente?','options':['Sim','Talvez','Não']},
+      {'id':'q4','text':'Você participaria de um projeto digital de monitoramento ambiental (como acompanhar dados de poluição, temperatura ou reciclagem)?','options':['Sim','Talvez','Não']},
+      {'id':'q5','text':'Você acredita que a escola deveria usar mais tecnologia para ensinar educação ambiental?','options':['Sim','Talvez','Não']},
+      {'id':'q6','text':'Você já usou algum aplicativo, site ou rede social com foco ambiental?','options':['Sim','Talvez','Não']},
+      {'id':'q7','text':'Você acha que a tecnologia pode ajudar na preservação do meio ambiente?','options':['Sim','Talvez','Não']},
+      {'id':'q8','text':'Você já participou de algum projeto ambiental (como reciclagem, plantio ou limpeza de áreas)?','options':['Sim, já participei','Não, mas tenho vontade','Não e não tenho interesse']},
+      {'id':'q9','text':'Você costuma seguir páginas, influenciadores ou canais sobre meio ambiente nas redes sociais?','options':['Sim, vários','Alguns','Não, mas gostaria','Não tenho interesse']},
+      {'id':'q10','text':'O que mais dificulta você ter hábitos sustentáveis hoje?','options':['Falta de tempo','Falta de informação','Falta de incentivo','Não acho importante']}
+    ];
+
+    function shuffle(a){ return a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]); }
+    let shuffled = shuffle(QUESTIONS.slice());
+    let answers = {};
+
+    const questionsEl = document.getElementById('questions');
+    const statusEl = document.getElementById('status');
+    const progressEl = document.getElementById('progress');
+    const messageEl = document.getElementById('message');
+
+    function render(){
+      questionsEl.innerHTML = '';
+      shuffled.forEach((q, idx)=>{
+        const wrap = document.createElement('div'); wrap.className='question';
+        const h = document.createElement('h3'); h.textContent = (idx+1) + '. ' + q.text; wrap.appendChild(h);
+        const opts = document.createElement('div'); opts.className='options';
+        q.options.forEach(opt=>{
+          const b = document.createElement('div'); b.className='option'; b.textContent = opt; b.tabIndex=0;
+          b.onclick = ()=>{ Array.from(opts.children).forEach(c=>c.classList.remove('selected')); b.classList.add('selected'); answers[q.id]=opt; updateStatus(); };
+          b.onkeydown = (e)=>{ if(e.key==='Enter') b.onclick(); };
+          opts.appendChild(b);
+        });
+        wrap.appendChild(opts);
+        questionsEl.appendChild(wrap);
+      });
+      updateStatus();
+    }
+
+    function updateStatus(){
+      statusEl.textContent = Object.keys(answers).length + '/' + QUESTIONS.length + ' respondidas';
+      const pct = Math.round((Object.keys(answers).length / QUESTIONS.length) * 100);
+      progressEl.innerHTML = `<div style="height:10px;background:#eee;border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#9ee2b6,#2b8a3e)"></i></div>`;
+    }
+
+    document.getElementById('submit').addEventListener('click', async ()=>{
+      if(Object.keys(answers).length < QUESTIONS.length){ alert('Por favor responda todas as perguntas.'); return; }
+      document.getElementById('submit').disabled = true; document.getElementById('submit').textContent='Enviando...';
+
+      try{
+        if(window.db){
+          await window.db.collection('respostas').add({ answers: answers, ts: Date.now() });
+          messageEl.innerHTML = '<div style="padding:10px;background:#e6fff0;border-radius:8px;color:#045">Obrigado — resposta enviada!</div>';
+        } else {
+          const key = 'survey_local_votes_v2';
+          const cur = JSON.parse(localStorage.getItem(key) || '[]');
+          cur.push({answers:answers,ts:Date.now()});
+          localStorage.setItem(key, JSON.stringify(cur));
+          messageEl.innerHTML = '<div style="padding:10px;background:#fff7e6;border-radius:8px;color:#7a4d00">Salvo localmente (Firebase não disponível).</div>';
+        }
+      }catch(err){
+        console.error(err);
+        alert('Erro ao enviar. Veja o console.');
+      }finally{
+        document.getElementById('submit').disabled = false; document.getElementById('submit').textContent='Enviar respostas';
+        answers = {}; shuffled = shuffle(QUESTIONS.slice()); render();
+      }
+    });
+
+    document.getElementById('view-results').addEventListener('click', ()=>{ window.open('results.html','_blank'); });
+    render();
+  </script>
+</body>
+</html>

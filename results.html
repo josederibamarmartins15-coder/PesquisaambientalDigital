@@ -1,2 +1,110 @@
-<!-- results.html: resultados da pesquisa -->
-[Conteúdo HTML completo da interface de resultados gerado acima]
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Resultados — Pesquisa Ambiental</title>
+  <style>
+    body{font-family:Inter,system-ui,Arial;background:#f4fff4;color:#053;padding:20px}
+    .card{max-width:980px;margin:0 auto;background:#fff;border-radius:10px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,0.06)}
+    h1{color:#2b8a3e}
+    .question{margin-bottom:14px}
+    .bar{height:18px;background:#eee;border-radius:9px;overflow:hidden}
+    .bar > i{display:block;height:100%;background:linear-gradient(90deg,#9ee2b6,#2b8a3e)}
+    .small{color:#445}
+    .muted{color:#667}
+    .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Resultados — Pesquisa: Monitoramento e Educação Ambiental Digital</h1>
+    <div class="controls">
+      <button id="refresh">Atualizar</button>
+      <div class="small muted">Os resultados são calculados a partir dos votos registrados (anônimos).</div>
+    </div>
+    <div id="content">Carregando...</div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script>
+    const QUESTIONS = [
+      {'id':'q1','text':'Você acha que o monitoramento digital pode ajudar a fiscalizar empresas poluidoras?','options':['Sim','Talvez','Não']},
+      {'id':'q2','text':'Você apoiaria o uso de tecnologias (como sensores e aplicativos) para melhorar o cuidado com o meio ambiente na sua cidade?','options':['Sim','Talvez','Não']},
+      {'id':'q3','text':'Você costuma refletir sobre como suas ações afetam o meio ambiente?','options':['Sim','Talvez','Não']},
+      {'id':'q4','text':'Você participaria de um projeto digital de monitoramento ambiental (como acompanhar dados de poluição, temperatura ou reciclagem)?','options':['Sim','Talvez','Não']},
+      {'id':'q5','text':'Você acredita que a escola deveria usar mais tecnologia para ensinar educação ambiental?','options':['Sim','Talvez','Não']},
+      {'id':'q6','text':'Você já usou algum aplicativo, site ou rede social com foco ambiental?','options':['Sim','Talvez','Não']},
+      {'id':'q7','text':'Você acha que a tecnologia pode ajudar na preservação do meio ambiente?','options':['Sim','Talvez','Não']},
+      {'id':'q8','text':'Você já participou de algum projeto ambiental (como reciclagem, plantio ou limpeza de áreas)?','options':['Sim, já participei','Não, mas tenho vontade','Não e não tenho interesse']},
+      {'id':'q9','text':'Você costuma seguir páginas, influenciadores ou canais sobre meio ambiente nas redes sociais?','options':['Sim, vários','Alguns','Não, mas gostaria','Não tenho interesse']},
+      {'id':'q10','text':'O que mais dificulta você ter hábitos sustentáveis hoje?','options':['Falta de tempo','Falta de informação','Falta de incentivo','Não acho importante']}
+    ];
+
+    async function computeAndRender(){
+      const container = document.getElementById('content');
+      container.innerHTML = 'Carregando dados...';
+      let counts = {};
+      QUESTIONS.forEach(q=>{ counts[q.id] = {}; q.options.forEach(o=>counts[q.id][o]=0); });
+      let totalDocs = 0;
+
+      try{
+        if(window.db){
+          const snap = await window.db.collection('respostas').get();
+          snap.forEach(doc=>{
+            totalDocs++;
+            const data = doc.data();
+            const ans = data.answers || {};
+            for(const q of QUESTIONS){
+              const v = ans[q.id];
+              if(v && typeof counts[q.id][v] !== 'undefined') counts[q.id][v]++;
+            }
+          });
+        } else {
+          const cur = JSON.parse(localStorage.getItem('survey_local_votes_v2') || '[]');
+          totalDocs = cur.length;
+          cur.forEach(entry=>{
+            const ans = entry.answers || {};
+            for(const q of QUESTIONS){
+              const v = ans[q.id];
+              if(v && typeof counts[q.id][v] !== 'undefined') counts[q.id][v]++;
+            }
+          });
+        }
+      }catch(err){
+        console.error(err);
+        container.innerHTML = '<div style="color:#b00">Erro ao ler dados (veja console).</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      for(const q of QUESTIONS){
+        const div = document.createElement('div'); div.className='question';
+        const title = document.createElement('div'); title.innerHTML = '<strong>' + q.text + '</strong>';
+        div.appendChild(title);
+        const total = Object.values(counts[q.id]).reduce((a,b)=>a+b,0);
+        q.options.forEach(opt=>{
+          const cnt = counts[q.id][opt] || 0;
+          const pct = total===0 ? 0 : Math.round((cnt/total)*100);
+          const row = document.createElement('div');
+          row.innerHTML = `<div style="display:flex;justify-content:space-between"><div>${opt}</div><div>${cnt} votos — ${pct}%</div></div>`;
+          const bar = document.createElement('div'); bar.className='bar'; const inner = document.createElement('i'); inner.style.width = pct + '%'; bar.appendChild(inner);
+          row.appendChild(bar);
+          div.appendChild(row);
+        });
+        container.appendChild(div);
+      }
+      const summary = document.createElement('div');
+      summary.style.marginTop = '12px';
+      summary.className = 'small muted';
+      summary.textContent = 'Total de respostas: ' + totalDocs;
+      container.appendChild(summary);
+    }
+
+    document.getElementById('refresh').addEventListener('click', computeAndRender);
+    computeAndRender();
+  </script>
+</body>
+</html>
